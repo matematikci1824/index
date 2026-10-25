@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="tr" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Öğrenci Deneme Net & Ödev Takip Sistemi (Firebase)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="h-full font-sans text-slate-800 flex flex-col">
+
+    <!-- Header / Navbar -->
+    <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo & Status -->
+                <div class="flex items-center space-x-3">
+                    <div class="bg-brand-500 p-2 rounded-lg text-white">
+                        <i class="fa-solid fa-graduation-cap text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg leading-tight">NetTakip & Ödev Portalı</h1>
+                        <div class="flex items-center space-x-2">
+                            <span id="firebase-status-badge" class="bg-amber-500/20 text-amber-300 text-[10px] px-2 py-0.5 rounded border border-amber-500/30 flex items-center gap-1">
+                                <i class="fa-solid fa-flask"></i> Demo Modu
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Controls: Firebase Settings & User Status -->
+                <div class="flex items-center space-x-3">
+                    <button onclick="openConfigModal()" class="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-medium transition">
+                        <i class="fa-solid fa-gear text-brand-400"></i>
+                        <span class="hidden sm:inline">Firebase Ayarları</span>
+                    </button>
+
+                    <div id="user-info-bar" class="hidden flex items-center space-x-3 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700 text-xs">
+                        <span id="current-user-email" class="font-medium text-slate-200"></span>
+                        <span id="current-user-role-badge" class="bg-brand-500/20 text-brand-300 px-2 py-0.5 rounded text-[10px] uppercase font-bold"></span>
+                        <button onclick="handleSignOut()" class="text-red-400 hover:text-red-300 ml-2" title="Çıkış Yap">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- AUTH LOGIN SCREEN (Shows when user is not logged in & not in instant demo mode) -->
+        <div id="auth-section" class="max-w-md mx-auto my-8 bg-white p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-200 space-y-6">
+            <div class="text-center space-y-2">
+                <div class="bg-brand-50 inline-block p-4 rounded-2xl text-brand-600 mb-1">
+                    <i class="fa-solid fa-lock text-3xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-900">Sisteme Giriş Yap</h2>
+                <p class="text-xs text-slate-500">Öğretmen veya öğrenci hesabınızla oturum açın.</p>
+            </div>
+
+            <!-- Login Form -->
+            <form onsubmit="handleSignIn(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">E-Posta Adresi</label>
+                    <input type="email" id="auth-email" required placeholder="ornek@okul.com" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Şifre</label>
+                    <input type="password" id="auth-password" required placeholder="••••••••" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500">
+                </div>
+                <button type="submit" id="btn-login-submit" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold shadow-lg transition">
+                    Giriş Yap
+                </button>
+            </form>
+
+            <div class="relative flex py-1 items-center">
+                <div class="flex-grow border-t border-slate-200"></div>
+                <span class="flex-shrink mx-4 text-xs text-slate-400">veya</span>
+                <div class="flex-grow border-t border-slate-200"></div>
+            </div>
+
+            <button onclick="enableDemoMode()" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-flask text-amber-500"></i>
+                <span>Giriş Yapmadan Demo Modunda Dene</span>
+            </button>
+        </div>
+
+        <!-- APP DASHBOARD (Hidden until authenticated or in demo mode) -->
+        <div id="app-dashboard" class="hidden space-y-6">
+
+            <!-- TEACHER VIEW SECTION -->
+            <section id="view-teacher" class="space-y-6">
+                <!-- Top Controls: Select Student & Add New Student User -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+                    <div class="flex-1 flex flex-col sm:flex-row sm:items-center gap-3">
+                        <label for="teacher-student-select" class="text-sm font-semibold text-slate-700 whitespace-nowrap flex items-center gap-2">
+                            <i class="fa-solid fa-users text-brand-600"></i>
+                            <span>İşlem Yapılan Öğrenci:</span>
+                        </label>
+                        <select id="teacher-student-select" onchange="onSelectedStudentChange()" class="w-full sm:w-64 bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-brand-500 focus:border-brand-500 p-2.5 font-medium">
+                            <!-- Dynamically filled -->
+                        </select>
+                    </div>
+
+                    <button onclick="openAddStudentModal()" class="bg-slate-900 hover:bg-slate-800 text-white font-medium px-4 py-2.5 rounded-xl text-sm transition flex items-center justify-center space-x-2 shadow">
+                        <i class="fa-solid fa-user-plus text-amber-400"></i>
+                        <span>Yeni Öğrenci Hesabı Ekle</span>
+                    </button>
+                </div>
+
+                <!-- Teacher Action Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-gradient-to-br from-brand-600 to-brand-700 rounded-2xl p-5 text-white shadow-md flex items-center justify-between">
+                        <div>
+                            <span class="text-xs font-semibold text-brand-100 uppercase tracking-wider">Deneme Sınavı Girişi</span>
+                            <h2 class="text-xl font-bold mt-1" id="teacher-selected-student-name">Öğrenci Seçiniz</h2>
+                            <p class="text-xs text-brand-100/80 mt-1">Netleri Firestore veritabanına kaydet.</p>
+                        </div>
+                        <button onclick="openAddNetModal()" class="bg-white text-brand-700 hover:bg-brand-50 font-semibold px-4 py-2.5 rounded-xl text-sm transition shadow flex items-center gap-2 whitespace-nowrap">
+                            <i class="fa-solid fa-plus-circle text-brand-600"></i>
+                            <span>Net Gir</span>
+                        </button>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl p-5 text-white shadow-md flex items-center justify-between">
+                        <div>
+                            <span class="text-xs font-semibold text-indigo-100 uppercase tracking-wider">PDF Ödev Gönderimi</span>
+                            <h2 class="text-xl font-bold mt-1">Ödev & PDF Yükle</h2>
+                            <p class="text-xs text-indigo-100/80 mt-1">Firebase Storage'a PDF yükle ve geri dönüt ver.</p>
+                        </div>
+                        <button onclick="openAddHomeworkModal()" class="bg-white text-indigo-800 hover:bg-indigo-50 font-semibold px-4 py-2.5 rounded-xl text-sm transition shadow flex items-center gap-2 whitespace-nowrap">
+                            <i class="fa-solid fa-file-circle-plus text-indigo-600"></i>
+                            <span>Ödev Ver</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Net Chart & Net List -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                        <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-brand-600"></i>
+                            <span>Deneme Net Gelişim Grafiği (Real-Time)</span>
+                        </h3>
+                        <div class="relative flex-1 min-h-[260px]">
+                            <canvas id="teacherNetChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                        <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-list-check text-slate-600"></i>
+                            <span>Sınav Geçmişi</span>
+                        </h3>
+                        <div id="teacher-net-list" class="space-y-3 overflow-y-auto max-h-[300px] pr-1 custom-scrollbar flex-1">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Teacher Homework List & Feedback Section -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-slate-800 text-lg mb-4 pb-3 border-b border-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-book-open text-indigo-600"></i>
+                        <span>Verilen Ödevler & Geri Dönüt Yönetimi</span>
+                    </h3>
+                    <div id="teacher-homework-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- STUDENT VIEW SECTION -->
+            <section id="view-student" class="space-y-6 hidden">
+                <div class="bg-emerald-900 text-emerald-100 p-4 rounded-2xl shadow-md border border-emerald-700 flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="bg-emerald-700/50 p-2.5 rounded-xl border border-emerald-500/40">
+                            <i class="fa-solid fa-user-graduate text-xl text-emerald-300"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs text-emerald-300 uppercase tracking-wider font-semibold">Öğrenci Portalı</span>
+                            <h2 class="text-lg font-bold text-white" id="student-welcome-name">Hoş Geldiniz</h2>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Student Stats -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                        <div class="bg-brand-50 text-brand-600 p-3 rounded-xl text-2xl"><i class="fa-solid fa-bullseye"></i></div>
+                        <div>
+                            <p class="text-xs text-slate-500 font-medium">Ortalama Net</p>
+                            <h4 class="text-2xl font-bold text-slate-800" id="stat-avg-net">0.00</h4>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                        <div class="bg-amber-50 text-amber-600 p-3 rounded-xl text-2xl"><i class="fa-solid fa-clock"></i></div>
+                        <div>
+                            <p class="text-xs text-slate-500 font-medium">Bekleyen Ödevler</p>
+                            <h4 class="text-2xl font-bold text-slate-800" id="stat-pending-hw">0</h4>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                        <div class="bg-emerald-50 text-emerald-600 p-3 rounded-xl text-2xl"><i class="fa-solid fa-circle-check"></i></div>
+                        <div>
+                            <p class="text-xs text-slate-500 font-medium">Tamamlanan Ödevler</p>
+                            <h4 class="text-2xl font-bold text-slate-800" id="stat-completed-hw">0</h4>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Student Net Chart & List -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-area text-brand-600"></i>
+                            <span>Deneme Net Gelişimim</span>
+                        </h3>
+                        <div class="relative min-h-[260px]">
+                            <canvas id="studentNetChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                        <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-award text-amber-500"></i>
+                            <span>Son Denemelerim</span>
+                        </h3>
+                        <div id="student-net-list" class="space-y-3 overflow-y-auto max-h-[300px] custom-scrollbar flex-1">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Student Homework Cards -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-slate-800 text-lg mb-4 pb-3 border-b border-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-book-reader text-indigo-600"></i>
+                        <span>Ödevlerim & Öğretmen Geri Dönütleri</span>
+                    </h3>
+                    <div id="student-homework-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </section>
+        </div>
+
+    </main>
+
+    <!-- MODALS -->
+
+    <!-- Modal: Firebase Config Settings -->
+    <div id="modal-config" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-brand-600"></i>
+                    <span>Firebase Yapılandırması (Config)</span>
+                </h3>
+                <button onclick="closeModal('modal-config')" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-500">
+                Firebase Konsolundan aldığınız <code>firebaseConfig</code> JSON nesnesini aşağıdaki alana yapıştırabilirsiniz.
+            </p>
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Firebase Configuration JSON</label>
+                <textarea id="firebase-config-input" rows="6" class="w-full font-mono text-xs bg-slate-900 text-emerald-400 p-3 rounded-xl" placeholder='{
+  "apiKey": "AIzaSy...",
+  "authDomain": "proje.firebaseapp.com",
+  "projectId": "proje-id",
+  "storageBucket": "proje.appspot.com",
+  "messagingSenderId": "...",
+  "appId": "..."
+}'></textarea>
+            </div>
+            <div class="flex justify-between items-center pt-2 border-t border-slate-100">
+                <button onclick="enableDemoMode(); closeModal('modal-config');" class="text-xs text-amber-600 font-bold hover:underline">
+                    Demo Moduna Geç
+                </button>
+                <div class="space-x-2">
+                    <button onclick="closeModal('modal-config')" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-medium">İptal</button>
+                    <button onclick="saveFirebaseConfig()" class="px-4 py-2 bg-brand-600 text-white rounded-xl text-xs font-medium shadow">Kaydet & Başlat</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Add Student Account -->
+    <div id="modal-add-student" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-user-plus text-brand-600"></i>
+                    <span>Yeni Öğrenci Kaydı</span>
+                </h3>
+                <button onclick="closeModal('modal-add-student')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form onsubmit="handleAddStudent(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Öğrenci Adı Soyadı</label>
+                    <input type="text" id="input-student-name" required placeholder="Örn: Ahmet Yılmaz" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Sınıf / Şube</label>
+                    <input type="text" id="input-student-grade" required placeholder="Örn: 8-A" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Öğrenci Giriş E-Postası</label>
+                    <input type="email" id="input-student-email" required placeholder="ahmet@okul.com" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Giriş Şifresi</label>
+                    <input type="password" id="input-student-pass" required placeholder="••••••••" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm">
+                </div>
+                <div class="pt-2 flex justify-end space-x-2">
+                    <button type="button" onclick="closeModal('modal-add-student')" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium">İptal</button>
+                    <button type="submit" class="px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-medium shadow">Öğrenciyi Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add Net Scores -->
+    <div id="modal-add-net" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square text-brand-600"></i>
+                    <span>Deneme Neti Gir</span>
+                </h3>
+                <button onclick="closeModal('modal-add-net')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form onsubmit="handleAddNet(event)" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Deneme / Yayın Adı</label>
+                        <input type="text" id="input-exam-name" required placeholder="Örn: Özdebir LGS-3" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Sınav Tarihi</label>
+                        <input type="date" id="input-exam-date" required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700">Türkçe</label>
+                        <input type="number" step="0.25" id="net-turkce" value="0" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-sm mt-1">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700">Matematik</label>
+                        <input type="number" step="0.25" id="net-mat" value="0" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-sm mt-1">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700">Fen Bilimleri</label>
+                        <input type="number" step="0.25" id="net-fen" value="0" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-sm mt-1">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700">Sosyal Bilgiler</label>
+                        <input type="number" step="0.25" id="net-sosyal" value="0" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-sm mt-1">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700">Yabancı Dil</label>
+                        <input type="number" step="0.25" id="net-ydil" value="0" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-sm mt-1">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700">Din Kültürü</label>
+                        <input type="number" step="0.25" id="net-din" value="0" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-sm mt-1">
+                    </div>
+                </div>
+                <div class="pt-2 flex justify-end space-x-2 border-t border-slate-100">
+                    <button type="button" onclick="closeModal('modal-add-net')" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium">İptal</button>
+                    <button type="submit" class="px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-medium shadow">Netleri Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add Homework with PDF Upload -->
+    <div id="modal-add-homework" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-file-circle-plus text-indigo-600"></i>
+                    <span>Ödev Oluştur & PDF Yükle</span>
+                </h3>
+                <button onclick="closeModal('modal-add-homework')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form onsubmit="handleAddHomework(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Ödev Başlığı</label>
+                    <input type="text" id="input-hw-title" required placeholder="Örn: Üslü İfadeler Beceri Temelli Sorular" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Ders</label>
+                        <select id="input-hw-subject" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm">
+                            <option value="Matematik">Matematik</option>
+                            <option value="Türkçe">Türkçe</option>
+                            <option value="Fen Bilimleri">Fen Bilimleri</option>
+                            <option value="Sosyal Bilgiler">Sosyal Bilgiler</option>
+                            <option value="Yabancı Dil">Yabancı Dil</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Son Teslim Tarihi</label>
+                        <input type="date" id="input-hw-due" required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Açıklama</label>
+                    <textarea id="input-hw-desc" rows="2" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm"></textarea>
+                </div>
+                <div class="bg-indigo-50/70 border border-indigo-100 p-3.5 rounded-xl space-y-2">
+                    <label class="block text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                        <i class="fa-solid fa-cloud-arrow-up text-indigo-600"></i>
+                        <span>Firebase Storage'a PDF Ödev Yükle</span>
+                    </label>
+                    <input type="file" id="input-hw-pdf-file" accept="application/pdf" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700">
+                </div>
+                <div class="pt-2 flex justify-end space-x-2 border-t border-slate-100">
+                    <button type="button" onclick="closeModal('modal-add-homework')" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium">İptal</button>
+                    <button type="submit" id="btn-submit-hw" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium shadow">Ödevi Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Feedback -->
+    <div id="modal-teacher-feedback" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-100 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-comment-dots text-indigo-600"></i>
+                    <span>Öğrenci Ödev Geri Dönütü</span>
+                </h3>
+                <button onclick="closeModal('modal-teacher-feedback')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form onsubmit="handleSaveFeedback(event)" class="space-y-4">
+                <input type="hidden" id="fb-hw-id">
+                <div id="fb-hw-title" class="font-bold text-sm text-slate-800"></div>
+                <div id="fb-student-notes" class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200"></div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Değerlendirme Puanı</label>
+                    <select id="fb-rating" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm">
+                        <option value="Mükemmel (100/100)">⭐⭐⭐⭐⭐ Mükemmel</option>
+                        <option value="İyi (80/100)">⭐⭐⭐⭐ Çok İyi</option>
+                        <option value="Geliştirilmeli (60/100)">⭐⭐⭐ Geliştirilmeli</option>
+                        <option value="Tekrar Yapılmalı">⚠️ Tekrar Yapılmalı</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Öğretmen Mesajı</label>
+                    <textarea id="fb-comment" rows="3" required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm"></textarea>
+                </div>
+                <div class="pt-2 flex justify-end space-x-2 border-t border-slate-100">
+                    <button type="button" onclick="closeModal('modal-teacher-feedback')" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium">İptal</button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium shadow">Geri Dönütü Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Student Submission -->
+    <div id="modal-student-submit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-paper-plane text-emerald-600"></i>
+                    <span>Ödeve Yanıt / Not Ekle</span>
+                </h3>
+                <button onclick="closeModal('modal-student-submit')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form onsubmit="handleStudentSubmission(event)" class="space-y-4">
+                <input type="hidden" id="student-sub-hw-id">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Cevap / Notunuz</label>
+                    <textarea id="student-sub-notes" rows="4" required placeholder="Sorularımı tamamladım..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm"></textarea>
+                </div>
+                <div class="pt-2 flex justify-end space-x-2 border-t border-slate-100">
+                    <button type="button" onclick="closeModal('modal-student-submit')" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium">İptal</button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium shadow">Ödevi Gönder</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- FIREBASE & APPLICATION LOGIC -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, 
+            signOut, onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, collection, doc, setDoc, getDoc, getDocs, 
+            addDoc, updateDoc, onSnapshot, query, where 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { 
+            getStorage, ref, uploadBytes, getDownloadURL 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+        // Global State & Handles
+        let firebaseApp = null;
+        let auth = null;
+        let db = null;
+        let storage = null;
+
+        let isDemoMode = true;
+        let currentUser = null; // { uid, email, role: 'teacher'|'student', name, studentId }
+        let selectedStudentId = '';
+
+        let activeStudents = [];
+        let activeNets = [];
+        let activeHomeworks = [];
+
+        let teacherChartInstance = null;
+        let studentChartInstance = null;
+
+        // --- FIREBASE INITIALIZATION ---
+        window.addEventListener('load', () => {
+            const savedConfig = localStorage.getItem('firebase_config');
+            if (savedConfig) {
+                try {
+                    const configObj = JSON.parse(savedConfig);
+                    initFirebase(configObj);
+                } catch (e) {
+                    enableDemoMode();
+                }
+            } else {
+                enableDemoMode();
+            }
+        });
+
+        function initFirebase(config) {
+            try {
+                firebaseApp = initializeApp(config);
+                auth = getAuth(firebaseApp);
+                db = getFirestore(firebaseApp);
+                storage = getStorage(firebaseApp);
+                isDemoMode = false;
+
+                document.getElementById('firebase-status-badge').className = "bg-emerald-500/20 text-emerald-300 text-[10px] px-2 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1";
+                document.getElementById('firebase-status-badge').innerHTML = `<i class="fa-solid fa-cloud-check"></i> Firebase Canlı`;
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        // Fetch user document from Firestore
+                        const userDoc = await getDoc(doc(db, "users", user.uid));
+                        if (userDoc.exists()) {
+                            currentUser = { uid: user.uid, email: user.email, ...userDoc.data() };
+                        } else {
+                            currentUser = { uid: user.uid, email: user.email, role: 'teacher' };
+                        }
+                        setupAuthenticatedUI();
+                    } else {
+                        currentUser = null;
+                        document.getElementById('auth-section').classList.remove('hidden');
+                        document.getElementById('app-dashboard').classList.add('hidden');
+                        document.getElementById('user-info-bar').classList.add('hidden');
+                    }
+                });
+            } catch (err) {
+                console.warn("Firebase başlatılamadı, Demo Moduna geçiliyor:", err);
+                enableDemoMode();
+            }
+        }
+
+        window.enableDemoMode = function() {
+            isDemoMode = true;
+            document.getElementById('firebase-status-badge').className = "bg-amber-500/20 text-amber-300 text-[10px] px-2 py-0.5 rounded border border-amber-500/30 flex items-center gap-1";
+            document.getElementById('firebase-status-badge').innerHTML = `<i class="fa-solid fa-flask"></i> Demo Modu (Local)`;
+
+            // Load Demo Mock Data
+            activeStudents = [
+                { id: "std-1", name: "Zeynep Kaya", grade: "8-A", email: "zeynep@okul.com" },
+                { id: "std-2", name: "Ali Yılmaz", grade: "12-Sayısal", email: "ali@okul.com" }
+            ];
+            activeNets = [
+                { id: "net-1", studentId: "std-1", examName: "Özdebir LGS-1", date: "2026-03-01", turkce: 18, mat: 16, fen: 17, sosyal: 9, ydil: 10, din: 10, total: 80 }
+            ];
+            activeHomeworks = [
+                { id: "hw-1", studentId: "std-1", title: "Üslü Sayılar Testi", subject: "Matematik", dueDate: "2026-03-25", description: "İlk 20 soruyu çözün.", pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", pdfName: "Uslu_Sayilar.pdf", status: "pending", studentSubmission: "", feedback: "", rating: "" }
+            ];
+
+            currentUser = { uid: "demo-teacher", email: "ogretmen@demo.com", role: "teacher" };
+            setupAuthenticatedUI();
+        };
+
+        window.saveFirebaseConfig = function() {
+            const raw = document.getElementById('firebase-config-input').value.trim();
+            try {
+                const parsed = JSON.parse(raw);
+                localStorage.setItem('firebase_config', JSON.stringify(parsed));
+                initFirebase(parsed);
+                closeModal('modal-config');
+            } catch (e) {
+                alert("Geçersiz JSON formatı! Lütfen Firebase yapılandırma nesnesini kontrol edin.");
+            }
+        };
+
+        // --- AUTH ACTIONS ---
+        window.handleSignIn = async function(e) {
+            e.preventDefault();
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+
+            if (isDemoMode) {
+                enableDemoMode();
+                return;
+            }
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (err) {
+                alert("Giriş Başarısız: " + err.message);
+            }
+        };
+
+        window.handleSignOut = function() {
+            if (auth && !isDemoMode) {
+                signOut(auth);
+            } else {
+                document.getElementById('auth-section').classList.remove('hidden');
+                document.getElementById('app-dashboard').classList.add('hidden');
+                document.getElementById('user-info-bar').classList.add('hidden');
+            }
+        };
+
+        function setupAuthenticatedUI() {
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('app-dashboard').classList.remove('hidden');
+
+            const infoBar = document.getElementById('user-info-bar');
+            infoBar.classList.remove('hidden');
+            document.getElementById('current-user-email').textContent = currentUser.email;
+            document.getElementById('current-user-role-badge').textContent = currentUser.role === 'teacher' ? 'Öğretmen' : 'Öğrenci';
+
+            if (currentUser.role === 'teacher') {
+                document.getElementById('view-teacher').classList.remove('hidden');
+                document.getElementById('view-student').classList.add('hidden');
+                loadTeacherData();
+            } else {
+                document.getElementById('view-teacher').classList.add('hidden');
+                document.getElementById('view-student').classList.remove('hidden');
+                selectedStudentId = currentUser.studentId || currentUser.uid;
+                loadStudentData();
+            }
+        }
+
+        // --- FIRESTORE / DATA LOADERS ---
+        async function loadTeacherData() {
+            if (isDemoMode) {
+                populateStudentSelect();
+                renderTeacherDashboard();
+                return;
+            }
+
+            // Real-time listener for students
+            onSnapshot(collection(db, "students"), (snapshot) => {
+                activeStudents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                populateStudentSelect();
+                if (activeStudents.length > 0 && !selectedStudentId) {
+                    selectedStudentId = activeStudents[0].id;
+                }
+                listenSelectedStudentRealtimeData();
+            });
+        }
+
+        function listenSelectedStudentRealtimeData() {
+            if (!selectedStudentId || isDemoMode) return;
+
+            // Listen Net Scores
+            const netQuery = query(collection(db, "nets"), where("studentId", "==", selectedStudentId));
+            onSnapshot(netQuery, (snapshot) => {
+                activeNets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderTeacherDashboard();
+            });
+
+            // Listen Homeworks
+            const hwQuery = query(collection(db, "homeworks"), where("studentId", "==", selectedStudentId));
+            onSnapshot(hwQuery, (snapshot) => {
+                activeHomeworks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderTeacherDashboard();
+            });
+        }
+
+        async function loadStudentData() {
+            if (isDemoMode) {
+                renderStudentDashboard();
+                return;
+            }
+
+            // Real-time listener for current student's nets
+            const netQuery = query(collection(db, "nets"), where("studentId", "==", selectedStudentId));
+            onSnapshot(netQuery, (snapshot) => {
+                activeNets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderStudentDashboard();
+            });
+
+            // Real-time listener for current student's homeworks
+            const hwQuery = query(collection(db, "homeworks"), where("studentId", "==", selectedStudentId));
+            onSnapshot(hwQuery, (snapshot) => {
+                activeHomeworks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderStudentDashboard();
+            });
+        }
+
+        // --- DOM RENDER FUNCTIONS ---
+        function populateStudentSelect() {
+            const select = document.getElementById('teacher-student-select');
+            select.innerHTML = '';
+            activeStudents.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = `${s.name} (${s.grade})`;
+                select.appendChild(opt);
+            });
+            if (selectedStudentId) select.value = selectedStudentId;
+        }
+
+        window.onSelectedStudentChange = function() {
+            selectedStudentId = document.getElementById('teacher-student-select').value;
+            listenSelectedStudentRealtimeData();
+            renderTeacherDashboard();
+        };
+
+        function renderTeacherDashboard() {
+            const student = activeStudents.find(s => s.id === selectedStudentId);
+            document.getElementById('teacher-selected-student-name').textContent = student ? student.name : 'Öğrenci Seçiniz';
+
+            // Nets List
+            const studentNets = activeNets.filter(n => n.studentId === selectedStudentId).sort((a,b) => new Date(a.date) - new Date(b.date));
+            const netList = document.getElementById('teacher-net-list');
+            netList.innerHTML = '';
+
+            studentNets.slice().reverse().forEach(n => {
+                netList.innerHTML += `
+                    <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl flex justify-between items-center">
+                        <div>
+                            <div class="font-bold text-slate-800 text-sm">${n.examName}</div>
+                            <div class="text-xs text-slate-500">${n.date}</div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-brand-600 font-extrabold text-base">${n.total} Net</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            renderChart('teacherNetChart', studentNets, true);
+
+            // Homework List
+            const studentHws = activeHomeworks.filter(h => h.studentId === selectedStudentId);
+            const hwList = document.getElementById('teacher-homework-list');
+            hwList.innerHTML = '';
+
+            studentHws.forEach(h => {
+                hwList.innerHTML += `
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                        <div class="flex justify-between items-start">
+                            <span class="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded">${h.subject}</span>
+                            <span class="text-xs font-semibold ${h.status === 'reviewed' ? 'text-emerald-600' : 'text-amber-600'}">${h.status}</span>
+                        </div>
+                        <h4 class="font-bold text-slate-800">${h.title}</h4>
+                        ${h.pdfUrl ? `
+                            <a href="${h.pdfUrl}" target="_blank" class="text-xs text-red-600 font-bold flex items-center gap-1">
+                                <i class="fa-solid fa-file-pdf"></i> ${h.pdfName || 'PDF İndir'}
+                            </a>
+                        ` : ''}
+                        ${h.feedback ? `<div class="text-xs bg-emerald-50 text-emerald-800 p-2 rounded">Geri Dönüt: ${h.feedback}</div>` : ''}
+                        <button onclick="openFeedbackModal('${h.id}')" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-medium">Değerlendir</button>
+                    </div>
+                `;
+            });
+        }
+
+        function renderStudentDashboard() {
+            const studentNets = activeNets.sort((a,b) => new Date(a.date) - new Date(b.date));
+            const avg = studentNets.length > 0 ? (studentNets.reduce((a,b)=>a+b.total,0)/studentNets.length).toFixed(2) : "0.00";
+            
+            document.getElementById('stat-avg-net').textContent = avg;
+            document.getElementById('stat-pending-hw').textContent = activeHomeworks.filter(h => h.status === 'pending').length;
+            document.getElementById('stat-completed-hw').textContent = activeHomeworks.filter(h => h.status !== 'pending').length;
+
+            renderChart('studentNetChart', studentNets, false);
+
+            const hwList = document.getElementById('student-homework-list');
+            hwList.innerHTML = '';
+            activeHomeworks.forEach(h => {
+                hwList.innerHTML += `
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                        <h4 class="font-bold text-slate-800">${h.title}</h4>
+                        <p class="text-xs text-slate-600">${h.description}</p>
+                        ${h.pdfUrl ? `<a href="${h.pdfUrl}" target="_blank" class="text-xs text-red-600 font-bold"><i class="fa-solid fa-file-pdf"></i> PDF Ödevi İndir</a>` : ''}
+                        ${h.feedback ? `<div class="text-xs bg-emerald-50 text-emerald-900 p-2.5 rounded-xl border border-emerald-200"><strong>Öğretmen Dönütü:</strong> ${h.feedback}</div>` : ''}
+                        <button onclick="openStudentSubmitModal('${h.id}')" class="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg">Cevap Gönder</button>
+                    </div>
+                `;
+            });
+        }
+
+        // --- CHART JS ---
+        function renderChart(canvasId, netsData, isTeacher) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            if (isTeacher && teacherChartInstance) teacherChartInstance.destroy();
+            if (!isTeacher && studentChartInstance) studentChartInstance.destroy();
+
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: netsData.map(n => n.examName),
+                    datasets: [{
+                        label: 'Toplam Net',
+                        data: netsData.map(n => n.total),
+                        borderColor: '#0284c7',
+                        backgroundColor: 'rgba(2, 132, 199, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            if (isTeacher) teacherChartInstance = chart;
+            else studentChartInstance = chart;
+        }
+
+        // --- FORM HANDLERS (ADD STUDENT, ADD NET, UPLOAD PDF HW) ---
+        window.handleAddStudent = async function(e) {
+            e.preventDefault();
+            const name = document.getElementById('input-student-name').value;
+            const grade = document.getElementById('input-student-grade').value;
+            const email = document.getElementById('input-student-email').value;
+            const pass = document.getElementById('input-student-pass').value;
+
+            if (isDemoMode) {
+                const newId = 'std-' + Date.now();
+                activeStudents.push({ id: newId, name, grade, email });
+                populateStudentSelect();
+                closeModal('modal-add-student');
+                return;
+            }
+
+            try {
+                // 1. Create Auth User
+                const res = await createUserWithEmailAndPassword(auth, email, pass);
+                // 2. Save Document to Firestore
+                await setDoc(doc(db, "users", res.user.uid), {
+                    role: 'student',
+                    name,
+                    grade,
+                    studentId: res.user.uid
+                });
+                await setDoc(doc(db, "students", res.user.uid), {
+                    name,
+                    grade,
+                    email
+                });
+
+                closeModal('modal-add-student');
+                alert("Öğrenci hesabı başarıyla açıldı!");
+            } catch (err) {
+                alert("Hata: " + err.message);
+            }
+        };
+
+        window.handleAddNet = async function(e) {
+            e.preventDefault();
+            const examName = document.getElementById('input-exam-name').value;
+            const date = document.getElementById('input-exam-date').value;
+            const turkce = parseFloat(document.getElementById('net-turkce').value) || 0;
+            const mat = parseFloat(document.getElementById('net-mat').value) || 0;
+            const fen = parseFloat(document.getElementById('net-fen').value) || 0;
+            const total = turkce + mat + fen;
+
+            const netObj = { studentId: selectedStudentId, examName, date, turkce, mat, fen, total };
+
+            if (isDemoMode) {
+                activeNets.push({ id: 'net-' + Date.now(), ...netObj });
+                renderTeacherDashboard();
+                closeModal('modal-add-net');
+                return;
+            }
+
+            await addDoc(collection(db, "nets"), netObj);
+            closeModal('modal-add-net');
+        };
+
+        window.handleAddHomework = async function(e) {
+            e.preventDefault();
+            const title = document.getElementById('input-hw-title').value;
+            const subject = document.getElementById('input-hw-subject').value;
+            const dueDate = document.getElementById('input-hw-due').value;
+            const description = document.getElementById('input-hw-desc').value;
+            const fileInput = document.getElementById('input-hw-pdf-file');
+
+            let pdfUrl = "";
+            let pdfName = "";
+
+            if (fileInput.files[0] && storage && !isDemoMode) {
+                const file = fileInput.files[0];
+                pdfName = file.name;
+                const storageRef = ref(storage, `homework_pdfs/${Date.now()}_${file.name}`);
+                const snapshot = await uploadBytes(storageRef, file);
+                pdfUrl = await getDownloadURL(snapshot.ref);
+            }
+
+            const hwObj = {
+                studentId: selectedStudentId,
+                title, subject, dueDate, description,
+                pdfUrl, pdfName,
+                status: 'pending'
+            };
+
+            if (isDemoMode) {
+                activeHomeworks.push({ id: 'hw-' + Date.now(), ...hwObj });
+                renderTeacherDashboard();
+                closeModal('modal-add-homework');
+                return;
+            }
+
+            await addDoc(collection(db, "homeworks"), hwObj);
+            closeModal('modal-add-homework');
+        };
+
+        // --- GLOBAL HELPER EXPORTS FOR HTML BUTTONS ---
+        window.openConfigModal = () => document.getElementById('modal-config').classList.remove('hidden');
+        window.openAddStudentModal = () => document.getElementById('modal-add-student').classList.remove('hidden');
+        window.openAddNetModal = () => document.getElementById('modal-add-net').classList.remove('hidden');
+        window.openAddHomeworkModal = () => document.getElementById('modal-add-homework').classList.remove('hidden');
+        window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
+
+        window.openFeedbackModal = (id) => {
+            document.getElementById('fb-hw-id').value = id;
+            document.getElementById('modal-teacher-feedback').classList.remove('hidden');
+        };
+
+        window.handleSaveFeedback = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('fb-hw-id').value;
+            const feedback = document.getElementById('fb-comment').value;
+            const rating = document.getElementById('fb-rating').value;
+
+            if (isDemoMode) {
+                const hw = activeHomeworks.find(h => h.id === id);
+                if (hw) { hw.feedback = feedback; hw.rating = rating; hw.status = 'reviewed'; }
+                renderTeacherDashboard();
+                closeModal('modal-teacher-feedback');
+                return;
+            }
+
+            await updateDoc(doc(db, "homeworks", id), { feedback, rating, status: 'reviewed' });
+            closeModal('modal-teacher-feedback');
+        };
+
+        window.openStudentSubmitModal = (id) => {
+            document.getElementById('student-sub-hw-id').value = id;
+            document.getElementById('modal-student-submit').classList.remove('hidden');
+        };
+
+        window.handleStudentSubmission = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('student-sub-hw-id').value;
+            const notes = document.getElementById('student-sub-notes').value;
+
+            if (isDemoMode) {
+                const hw = activeHomeworks.find(h => h.id === id);
+                if (hw) { hw.studentSubmission = notes; hw.status = 'submitted'; }
+                renderStudentDashboard();
+                closeModal('modal-student-submit');
+                return;
+            }
+
+            await updateDoc(doc(db, "homeworks", id), { studentSubmission: notes, status: 'submitted' });
+            closeModal('modal-student-submit');
+        };
+    </script>
+</body>
+</html>
